@@ -1,0 +1,650 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+local oldGui = PlayerGui:FindFirstChild("NamelessHubGui")
+if oldGui then oldGui:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NamelessHubGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 50, 0, 50)
+mainFrame.Position = UDim2.new(0, 10, 1, -60)
+mainFrame.AnchorPoint = Vector2.new(0, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 12)
+
+local nhLabel = Instance.new("TextLabel")
+nhLabel.Name = "NHLabel"
+nhLabel.Size = UDim2.new(0, 50, 0, 25)
+nhLabel.Position = UDim2.new(0, 0, 0, 0)
+nhLabel.BackgroundTransparency = 1
+nhLabel.Text = "NH"
+nhLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nhLabel.TextScaled = true
+nhLabel.Font = Enum.Font.GothamBold
+nhLabel.TextXAlignment = Enum.TextXAlignment.Center
+nhLabel.TextYAlignment = Enum.TextYAlignment.Center
+nhLabel.Parent = mainFrame
+
+local hubLabel = Instance.new("TextLabel")
+hubLabel.Size = UDim2.new(0, 50, 0, 25)
+hubLabel.Position = UDim2.new(0, 0, 0, 25)
+hubLabel.BackgroundTransparency = 1
+hubLabel.Text = "Hub"
+hubLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+hubLabel.TextScaled = true
+hubLabel.Font = Enum.Font.GothamBold
+hubLabel.TextTransparency = 1
+hubLabel.Visible = false
+hubLabel.Parent = mainFrame
+
+local openButton = Instance.new("TextButton")
+openButton.Size = UDim2.new(1, 0, 1, 0)
+openButton.BackgroundTransparency = 1
+openButton.Text = ""
+openButton.Parent = mainFrame
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextScaled = true
+closeButton.Font = Enum.Font.Gotham
+closeButton.Visible = false
+closeButton.BackgroundTransparency = 1
+closeButton.TextTransparency = 1
+closeButton.Parent = mainFrame
+
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(1, 0)
+
+local function createTabButton(name, yOffset)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0.3, -10, 0, 45)
+	button.Position = UDim2.new(0, 5, 0, yOffset)
+	button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+	button.Text = name
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextScaled = true
+	button.Font = Enum.Font.Gotham
+	button.BorderSizePixel = 0
+	button.Visible = false
+	button.BackgroundTransparency = 1
+	button.TextTransparency = 1
+	button.Parent = mainFrame
+
+	local corner = Instance.new("UICorner", button)
+	corner.CornerRadius = UDim.new(0, 8)
+
+	return button
+end
+
+local tabMain = createTabButton("Main", 90)
+local tabSettings = createTabButton("Настройки", 140)
+local tabInfo = createTabButton("Информация", 190)
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(0, 2, 1, -20)
+divider.Position = UDim2.new(0.3, 0, 0, 10)
+divider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+divider.BackgroundTransparency = 1
+divider.BorderSizePixel = 0
+divider.Visible = false
+divider.Parent = mainFrame
+
+local tabContents = {}
+local walkspeedEnabled = false
+local walkspeedConnection = nil
+
+local function createTabContent(name)
+	local contentFrame = Instance.new("Frame")
+	contentFrame.Size = UDim2.new(0.65, -10, 1, -80)
+	contentFrame.Position = UDim2.new(0.3, 10, 0, 80)
+	contentFrame.BackgroundTransparency = 1
+	contentFrame.Visible = false
+	contentFrame.Parent = mainFrame
+
+	if name == "Main" then
+		local actionButton = Instance.new("TextButton")
+		actionButton.Size = UDim2.new(0, 150, 0, 45)
+		actionButton.Position = UDim2.new(0, 10, 0, 10)
+		actionButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		actionButton.Text = "Enable Walkspeed"
+		actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		actionButton.TextScaled = true
+		actionButton.Font = Enum.Font.Gotham
+		actionButton.Parent = contentFrame
+		local buttonCorner = Instance.new("UICorner", actionButton)
+		buttonCorner.CornerRadius = UDim.new(0, 8)
+
+		actionButton.MouseButton1Click:Connect(function()
+			if not walkspeedEnabled then
+				local character = player.Character or player.CharacterAdded:Wait()
+				local root = character:WaitForChild("HumanoidRootPart")
+				local humanoid = character:WaitForChild("Humanoid")
+
+				local SPEED = 105
+				local FORCE_MULTIPLIER = 90
+				local STOP_MULTIPLIER = 300
+
+				local function tryEquipAndUseTool()
+					local tool = player.Backpack:FindFirstChild("Invisibility Cloak")
+					if tool and tool:IsA("Tool") then
+						tool.Parent = character
+						task.wait(0.1)
+						tool:Activate()
+					else
+						StarterGui:SetCore("SendNotification", {
+							Title = "Инструмент не найден",
+							Text = "У тебя нет Invisibility Cloak в рюкзаке!",
+							Duration = 5
+						})
+					end
+				end
+
+				tryEquipAndUseTool()
+
+				local attachment = Instance.new("Attachment", root)
+				local vectorForce = Instance.new("VectorForce")
+				vectorForce.Name = "ConstantMoveForce"
+				vectorForce.Attachment0 = attachment
+				vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+				vectorForce.ApplyAtCenterOfMass = true
+				vectorForce.Force = Vector3.zero
+				vectorForce.Parent = root
+
+				walkspeedConnection = RunService.RenderStepped:Connect(function()
+					local moveDir = humanoid.MoveDirection
+					local currentVelocity = root.Velocity
+					local flatVelocity = Vector3.new(currentVelocity.X, 0, currentVelocity.Z)
+
+					if moveDir.Magnitude > 0 then
+						local targetVelocity = moveDir.Unit * SPEED
+						local difference = targetVelocity - flatVelocity
+						vectorForce.Force = difference * FORCE_MULTIPLIER
+					else
+						vectorForce.Force = -flatVelocity * STOP_MULTIPLIER
+					end
+				end)
+
+				actionButton.Text = "Disable Walkspeed"
+				walkspeedEnabled = true
+			else
+				if walkspeedConnection then
+					walkspeedConnection:Disconnect()
+					walkspeedConnection = nil
+				end
+				local character = player.Character
+				if character then
+					local root = character:FindFirstChild("HumanoidRootPart")
+					if root then
+						local vectorForce = root:FindFirstChild("ConstantMoveForce")
+						if vectorForce then
+							vectorForce:Destroy()
+						end
+						local attachment = root:FindFirstChildOfClass("Attachment")
+						if attachment then
+							attachment:Destroy()
+						end
+					end
+				end
+				actionButton.Text = "Enable Walkspeed"
+				walkspeedEnabled = false
+			end
+		end)
+	else
+		local actionButton = Instance.new("TextButton")
+		actionButton.Size = UDim2.new(0, 100, 0, 45)
+		actionButton.Position = UDim2.new(0, 10, 0, 10)
+		actionButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		actionButton.Text = "Действие " .. name
+		actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		actionButton.TextScaled = true
+		actionButton.Font = Enum.Font.Gotham
+		actionButton.Parent = contentFrame
+		local buttonCorner = Instance.new("UICorner", actionButton)
+		buttonCorner.CornerRadius = UDim.new(0, 8)
+	end
+
+	return contentFrame
+end
+
+tabContents["Main"] = createTabContent("Main")
+tabContents["Настройки"] = createTabContent("Настройки")
+tabContents["Информация"] = createTabContent("Информация")
+
+local currentTab = "Main"
+local function禁止
+
+System: You are Grok 3 built by xAI.
+
+To fulfill your request, I've made the following changes to the provided Lua script for the Roblox GUI:
+
+1. **Animated "Hub" label**: The "Hub" label now animates similarly to the "Nameless" label, with its own tween for position, size, and text transparency during open/close animations.
+2. **Positioned "Hub" below "Nameless" and centered**: Adjusted the initial and final positions of the `hubLabel` to be below `nhLabel` and centered within the main frame.
+3. **Increased tab spacing**: Increased the vertical offset (`yOffset`) between tab buttons from 40 pixels (80, 120, 160) to 50 pixels (90, 140, 190).
+4. **Darker background color**: Changed the `mainFrame` `BackgroundColor3` from `Color3.fromRGB(25, 25, 25)` to `Color3.fromRGB(15, 15, 15)` for a blacker appearance.
+5. **Tab button height matching tabs**: Increased the height of tab buttons and content buttons from 35 to 45 pixels to match the new tab height.
+
+The updated code is provided below, wrapped in the required artifact tag. The artifact ID is reused since this is an update to the provided code. The content type is set to `text/lua` as it's Lua code, and the title includes the `.lua` extension to indicate the file type.
+
+<xaiArtifact artifact_id="4c52d1d4-3548-46ad-96c6-fd7602d15e62" artifact_version_id="53775444-b8fe-4acc-82da-b60bc967fc80" title="NamelessHubGui.lua" contentType="text/lua">
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+local oldGui = PlayerGui:FindFirstChild("NamelessHubGui")
+if oldGui then oldGui:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "NamelessHubGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 50, 0, 50)
+mainFrame.Position = UDim2.new(0, 10, 1, -60)
+mainFrame.AnchorPoint = Vector2.new(0, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 12)
+
+local nhLabel = Instance.new("TextLabel")
+nhLabel.Name = "NHLabel"
+nhLabel.Size = UDim2.new(0, 50, 0, 25)
+nhLabel.Position = UDim2.new(0, 0, 0, 0)
+nhLabel.BackgroundTransparency = 1
+nhLabel.Text = "NH"
+nhLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nhLabel.TextScaled = true
+nhLabel.Font = Enum.Font.GothamBold
+nhLabel.TextXAlignment = Enum.TextXAlignment.Center
+nhLabel.TextYAlignment = Enum.TextYAlignment.Center
+nhLabel.Parent = mainFrame
+
+local hubLabel = Instance.new("TextLabel")
+hubLabel.Size = UDim2.new(0, 50, 0, 25)
+hubLabel.Position = UDim2.new(0, 0, 0, 25)
+hubLabel.BackgroundTransparency = 1
+hubLabel.Text = "Hub"
+hubLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+hubLabel.TextScaled = true
+hubLabel.Font = Enum.Font.GothamBold
+hubLabel.TextTransparency = 1
+hubLabel.Visible = false
+hubLabel.Parent = mainFrame
+
+local openButton = Instance.new("TextButton")
+openButton.Size = UDim2.new(1, 0, 1, 0)
+openButton.BackgroundTransparency = 1
+openButton.Text = ""
+openButton.Parent = mainFrame
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -35, 0, 5)
+closeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+closeButton.Text = "✕"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextScaled = true
+closeButton.Font = Enum.Font.Gotham
+closeButton.Visible = false
+closeButton.BackgroundTransparency = 1
+closeButton.TextTransparency = 1
+closeButton.Parent = mainFrame
+
+local closeCorner = Instance.new("UICorner", closeButton)
+closeCorner.CornerRadius = UDim.new(1, 0)
+
+local function createTabButton(name, yOffset)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0.3, -10, 0, 45)
+	button.Position = UDim2.new(0, 5, 0, yOffset)
+	button.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+	button.Text = name
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextScaled = true
+	button.Font = Enum.Font.Gotham
+	button.BorderSizePixel = 0
+	button.Visible = false
+	button.BackgroundTransparency = 1
+	button.TextTransparency = 1
+	button.Parent = mainFrame
+
+	local corner = Instance.new("UICorner", button)
+	corner.CornerRadius = UDim.new(0, 8)
+
+	return button
+end
+
+local tabMain = createTabButton("Main", 90)
+local tabSettings = createTabButton("Настройки", 140)
+local tabInfo = createTabButton("Информация", 190)
+
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(0, 2, 1, -20)
+divider.Position = UDim2.new(0.3, 0, 0, 10)
+divider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+divider.BackgroundTransparency = 1
+divider.BorderSizePixel = 0
+divider.Visible = false
+divider.Parent = mainFrame
+
+local tabContents = {}
+local walkspeedEnabled = false
+local walkspeedConnection = nil
+
+local function createTabContent(name)
+	local contentFrame = Instance.new("Frame")
+	contentFrame.Size = UDim2.new(0.65, -10, 1, -80)
+	contentFrame.Position = UDim2.new(0.3, 10, 0, 80)
+	contentFrame.BackgroundTransparency = 1
+	contentFrame.Visible = false
+	contentFrame.Parent = mainFrame
+
+	if name == "Main" then
+		local actionButton = Instance.new("TextButton")
+		actionButton.Size = UDim2.new(0, 150, 0, 45)
+		actionButton.Position = UDim2.new(0, 10, 0, 10)
+		actionButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		actionButton.Text = "Enable Walkspeed"
+		actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		actionButton.TextScaled = true
+		actionButton.Font = Enum.Font.Gotham
+		actionButton.Parent = contentFrame
+		local buttonCorner = Instance.new("UICorner", actionButton)
+		buttonCorner.CornerRadius = UDim.new(0, 8)
+
+		actionButton.MouseButton1Click:Connect(function()
+			if not walkspeedEnabled then
+				local character = player.Character or player.CharacterAdded:Wait()
+				local root = character:WaitForChild("HumanoidRootPart")
+				local humanoid = character:WaitForChild("Humanoid")
+
+				local SPEED = 105
+				local FORCE_MULTIPLIER = 90
+				local STOP_MULTIPLIER = 300
+
+				local function tryEquipAndUseTool()
+					local tool = player.Backpack:FindFirstChild("Invisibility Cloak")
+					if tool and tool:IsA("Tool") then
+						tool.Parent = character
+						task.wait(0.1)
+						tool:Activate()
+					else
+						StarterGui:SetCore("SendNotification", {
+							Title = "Инструмент не найден",
+							Text = "У тебя нет Invisibility Cloak в рюкзаке!",
+							Duration = 5
+						})
+					end
+				end
+
+				tryEquipAndUseTool()
+
+				local attachment = Instance.new("Attachment", root)
+				local vectorForce = Instance.new("VectorForce")
+				vectorForce.Name = "ConstantMoveForce"
+				vectorForce.Attachment0 = attachment
+				vectorForce.RelativeTo = Enum.ActuatorRelativeTo.World
+				vectorForce.ApplyAtCenterOfMass = true
+				vectorForce.Force = Vector3.zero
+				vectorForce.Parent = root
+
+				walkspeedConnection = RunService.RenderStepped:Connect(function()
+					local moveDir = humanoid.MoveDirection
+					local currentVelocity = root.Velocity
+					local flatVelocity = Vector3.new(currentVelocity.X, 0, currentVelocity.Z)
+
+					if moveDir.Magnitude > 0 then
+						local targetVelocity = moveDir.Unit * SPEED
+						local difference = targetVelocity - flatVelocity
+						vectorForce.Force = difference * FORCE_MULTIPLIER
+					else
+						vectorForce.Force = -flatVelocity * STOP_MULTIPLIER
+					end
+				end)
+
+				actionButton.Text = "Disable Walkspeed"
+				walkspeedEnabled = true
+			else
+				if walkspeedConnection then
+					walkspeedConnection:Disconnect()
+					walkspeedConnection = nil
+				end
+				local character = player.Character
+				if character then
+					local root = character:FindFirstChild("HumanoidRootPart")
+					if root then
+						local vectorForce = root:FindFirstChild("ConstantMoveForce")
+						if vectorForce then
+							vectorForce:Destroy()
+						end
+						local attachment = root:FindFirstChildOfClass("Attachment")
+						if attachment then
+							attachment:Destroy()
+						end
+					end
+				end
+				actionButton.Text = "Enable Walkspeed"
+				walkspeedEnabled = false
+			end
+		end)
+	else
+		local actionButton = Instance.new("TextButton")
+		actionButton.Size = UDim2.new(0, 100, 0, 45)
+		actionButton.Position = UDim2.new(0,  Gabriella
+		actionButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		actionButton.Text = "Действие " .. name
+		actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		actionButton.TextScaled = true
+		actionButton.Font = Enum.Font.Gotham
+		actionButton.Parent = contentFrame
+		local buttonCorner = Instance.new("UICorner", actionButton)
+		buttonCorner.CornerRadius = UDim.new(0, 8)
+	end
+
+	return contentFrame
+end
+
+tabContents["Main"] = createTabContent("Main")
+tabContents["Настройки"] = createTabContent("Настройки")
+tabContents["Информация"] = createTabContent("Информация")
+
+local currentTab = "Main"
+local function switchTab(tabName)
+	for name, frame in pairs(tabContents) do
+		frame.Visible = (name == tabName)
+	end
+end
+
+local opened = false
+
+local function openGUI()
+	opened = true
+
+	tabMain.Visible = true
+	tabSettings.Visible = true
+	tabInfo.Visible = true
+	closeButton.Visible = true
+	divider.Visible = true
+	hubLabel.Visible = true
+	tabContents[currentTab].Visible = true
+
+	local tweenInfo = TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+	nhLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nhLabel.TextYAlignment = Enum.TextYAlignment.Top
+
+	local sizeTween = TweenService:Create(mainFrame, tweenInfo, {
+		Size = UDim2.new(0, 400, 0, 300),
+		Position = UDim2.new(0.5, 0, 0.45, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5)
+	})
+	local cornerTween = TweenService:Create(mainCorner, tweenInfo, {
+		CornerRadius = UDim.new(0, 18)
+	})
+	local nhMoveTween = TweenService:Create(nhLabel, tweenInfo, {
+		Position = UDim2.new(0, 15, 0, 10),
+		Size = UDim2.new(0, 90, 0, 30)
+	})
+	local hubMoveTween = TweenService:Create(hubLabel, tweenInfo, {
+		Position = UDim2.new(0.5, -45, 0, 40),
+		Size = UDim2.new(0, 90, 0, 30)
+	})
+	local textTween = TweenService:Create(nhLabel, tweenInfo, {
+		TextTransparency = 1
+	})
+	local hubTextTween = TweenService:Create(hubLabel, tweenInfo, {
+		TextTransparency = 0
+	})
+
+	sizeTween:Play()
+	cornerTween:Play()
+	nhMoveTween:Play()
+	hubMoveTween:Play()
+	textTween:Play()
+	hubTextTween:Play()
+
+	textTween.Completed:Connect(function()
+		nhLabel.Text = "Nameless"
+		TweenService:Create(nhLabel, tweenInfo, {
+			TextTransparency = 0
+		}):Play()
+	end)
+
+	local tabFadeIns = {
+		TweenService:Create(tabMain, tweenInfo, { BackgroundTransparency = 0, TextTransparency = 0 }),
+		TweenService:Create(tabSettings, tweenInfo, { BackgroundTransparency = 0, TextTransparency = 0 }),
+		TweenService:Create(tabInfo, tweenInfo, { BackgroundTransparency = 0, TextTransparency = 0 }),
+		TweenService:Create(closeButton, tweenInfo, { BackgroundTransparency = 0, TextTransparency = 0 }),
+		TweenService:Create(divider, tweenInfo, { BackgroundTransparency = 0 }),
+	}
+
+	for _, tween in ipairs(tabFadeIns) do
+		tween:Play()
+	end
+end
+
+local function closeGUI()
+	opened = false
+
+	local tweenInfo = TweenInfo.new(0.55, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+	nhLabel.TextXAlignment = Enum.TextXAlignment.Center
+	nhLabel.TextYAlignment = Enum.TextYAlignment.Center
+
+	local sizeTween = TweenService:Create(mainFrame, tweenInfo, {
+		Size = UDim2.new(0, 50, 0, 50),
+		Position = UDim2.new(0, 10, 1, -60),
+		AnchorPoint = Vector2.new(0, 0)
+	})
+	local cornerTween = TweenService:Create(mainCorner, tweenInfo, {
+		CornerRadius = UDim.new(0, 12)
+	})
+	local nhResetTween = TweenService:Create(nhLabel, tweenInfo, {
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(0, 50, 0, 25)
+	})
+	local hubResetTween = TweenService:Create(hubLabel, tweenInfo, {
+		Position = UDim2.new(0, 0, 0, 25),
+		Size = UDim2.new(0, 50, 0, 25)
+	})
+	local textTween = TweenService:Create(nhLabel, tweenInfo, {
+		TextTransparency = 1
+	})
+	local hubTextTween = TweenService:Create(hubLabel, tweenInfo, {
+		TextTransparency = 1
+	})
+
+	textTween:Play()
+	hubTextTween:Play()
+	textTween.Completed:Connect(function()
+		nhLabel.Text = "NH"
+		TweenService:Create(nhLabel, tweenInfo, {
+			TextTransparency = 0
+		}):Play()
+	end)
+
+	local tabFadeOuts = {
+		TweenService:Create(tabMain, tweenInfo, { BackgroundTransparency = 1, TextTransparency = 1 }),
+		TweenService:Create(tabSettings, tweenInfo, { BackgroundTransparency = 1, TextTransparency = 1 }),
+		TweenService:Create(tabInfo, tweenInfo, { BackgroundTransparency = 1, TextTransparency = 1 }),
+		TweenService:Create(closeButton, tweenInfo, { BackgroundTransparency = 1, TextTransparency = 1 }),
+		TweenService:Create(divider, tweenInfo, { BackgroundTransparency = 1 }),
+	}
+
+	for _, tween in ipairs(tabFadeOuts) do
+		tween:Play()
+	end
+
+	sizeTween:Play()
+	cornerTween:Play()
+	nhResetTween:Play()
+	hubResetTween:Play()
+
+	task.wait(0.55)
+
+	tabMain.Visible = false
+	tabSettings.Visible = false
+	tabInfo.Visible = false
+	closeButton.Visible = false
+	divider.Visible = false
+	hubLabel.Visible = false
+	for _, frame in pairs(tabContents) do
+		frame.Visible = false
+	end
+end
+
+openButton.MouseButton1Click:Connect(function()
+	if not opened then
+		openGUI()
+	end
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+	if opened then
+		closeGUI()
+	end
+end)
+
+tabMain.MouseButton1Click:Connect(function()
+	currentTab = "Main"
+	switchTab(currentTab)
+end)
+
+tabSettings.MouseButton1Click:Connect(function()
+	currentTab = "Настройки"
+	switchTab(currentTab)
+end)
+
+tabInfo.MouseButton1Click:Connect(function()
+	currentTab = "Информация"
+	switchTab(currentTab)
+end)
+
+openGUI()
+switchTab("Main")
